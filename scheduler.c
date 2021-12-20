@@ -17,13 +17,13 @@ typedef struct {
 	uint32_t d;
 } task_t;
 
-void swap(task_t* tasks, const uint32_t left, const uint32_t right) {
+void swap(task_t* tasks, uint32_t left, uint32_t right) {
 	task_t temp = tasks[left];
 	tasks[left] = tasks[right];
 	tasks[right] = temp;
 }
 
-uint32_t partition( task_t* tasks, const uint32_t left, const uint32_t right, const uint32_t pivot) {
+uint32_t partition_p(task_t* tasks, int32_t left, int32_t right, uint32_t pivot) {
 	int l = left - 1;
 	int r = right;
 
@@ -33,19 +33,25 @@ uint32_t partition( task_t* tasks, const uint32_t left, const uint32_t right, co
 		if (l >= r) {
 			break;
 		} else {
-			swap(tasks, l, r);
+			// swap(tasks, l, r);
+			task_t temp = tasks[l];
+			tasks[l] = tasks[r];
+			tasks[r] = temp;
 		}
 	}
-	swap(tasks, l, right);
+	// swap(tasks, l, right);
+	task_t temp = tasks[l];
+	tasks[l] = tasks[right];
+	tasks[right] = temp;
 	return l;
 }
 
-void quicksort_p(task_t* tasks, const uint32_t left, const uint32_t right) {
+void quicksort_p(task_t* tasks, int32_t left, int32_t right) {
 	if (right - left <= 0) {
 		return;
 	}
 	uint32_t pivot = tasks[right].d;
-	uint32_t part  = partition(tasks, left, right, pivot);
+	int32_t part  = partition_p(tasks, left, right, pivot);
 	quicksort_p(tasks, left, part - 1);
 	quicksort_p(tasks, part + 1, right);
 }
@@ -64,7 +70,7 @@ void load_data(const char filename[], uint32_t* n, task_t** tasks, uint64_t* w_m
 	for (int i = 0; i < *n; i++) {
 		assert(fscanf(f, "%li %li %lli", (long*) &t[i].p, (long*) &t[i].w, (long long*) &t[i].d) != EOF);
 		*w_max = t[i].w > *w_max ? t[i].w : *w_max;
-		(*tasks)[i].id = i + 1;
+		t[i].id = i + 1;
 	}
 
 	fclose(f);
@@ -88,16 +94,15 @@ int main(int argc, char** argv) {
 	task_t* tasks = NULL;
 
 	load_data("i6.dat", &n, &tasks, &w_max);
-	
+	assert(n != 0);
+	assert(w_max != 0);
+	assert(tasks != NULL);
 	quicksort_p(tasks, 0, n - 1);
 
 	if (getopt(argc, argv, "d") != -1) {
 		display_data(tasks, n, w_max);
 	}
 
-	assert(n != 0);
-	assert(w_max != 0);
-	assert(tasks != NULL);
 
 	free(tasks);
 
