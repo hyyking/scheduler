@@ -23,7 +23,7 @@ void swap(task_t* tasks, uint32_t left, uint32_t right) {
 	tasks[right] = temp;
 }
 
-uint32_t partition_p(task_t* tasks, int32_t left, int32_t right, uint32_t pivot) {
+uint32_t partition_d(task_t* tasks, int32_t left, int32_t right, uint32_t pivot) {
 	int l = left - 1;
 	int r = right;
 
@@ -46,16 +46,18 @@ uint32_t partition_p(task_t* tasks, int32_t left, int32_t right, uint32_t pivot)
 	return l;
 }
 
-void quicksort_p(task_t* tasks, int32_t left, int32_t right) {
+// Earliest due date algorithm using quicksort
+void edd_quicksort(task_t* tasks, int32_t left, int32_t right) {
 	if (right - left <= 0) {
 		return;
 	}
 	uint32_t pivot = tasks[right].d;
-	int32_t part  = partition_p(tasks, left, right, pivot);
-	quicksort_p(tasks, left, part - 1);
-	quicksort_p(tasks, part + 1, right);
+	int32_t part  = partition_d(tasks, left, right, pivot);
+	edd_quicksort(tasks, left, part - 1);
+	edd_quicksort(tasks, part + 1, right);
 }
 
+// Load an input data file allocating and filling an array of task_t
 void load_data(const char filename[], uint32_t* n, task_t** tasks, uint64_t* w_max) {
 	FILE* f = fopen(filename, "r");
 	assert(f != NULL);
@@ -88,6 +90,19 @@ void display_data(task_t* tasks, uint32_t n, uint64_t w_max) {
 	}
 }
 
+uint32_t moore(task_t* tasks, uint32_t n) {
+	uint32_t late = 0;
+	uint32_t curr_p = 0;
+
+	for (int i = 0; i < n; i++) {
+		curr_p += tasks[i].p;
+
+		if (curr_p > tasks[i].d) late++;
+	}
+
+	return late;
+}
+
 int main(int argc, char** argv) {	
 	uint32_t n = 0;
 	uint64_t w_max = 0;
@@ -97,14 +112,14 @@ int main(int argc, char** argv) {
 	assert(n != 0);
 	assert(w_max != 0);
 	assert(tasks != NULL);
-	quicksort_p(tasks, 0, n - 1);
+	edd_quicksort(tasks, 0, n - 1);
 
-	if (getopt(argc, argv, "d") != -1) {
+	if (getopt(argc, argv, "d") != -1)
 		display_data(tasks, n, w_max);
-	}
+	
+	printf("Moore: %i", moore(tasks, n));
 
 
 	free(tasks);
-
 	return 0;
 }
