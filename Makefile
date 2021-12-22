@@ -1,14 +1,15 @@
-CC = gcc -Wall -pedantic
+CC = clang # gcc
+ARGS = -Wall -pedantic
 
 .PHONY: release debug
 
 debug: scheduler
-	./$< -d
+	valgrind -q ./$< -d
 
 release: scheduler
 	./$<
 
 scheduler: scheduler.c
-	$(CC) -o3 $< -o scheduler
+	$(CC) $(ARGS) -o3 $< -o scheduler
 
 
