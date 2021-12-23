@@ -4,7 +4,7 @@ ARGS = -Wall -pedantic
 .PHONY: release debug
 
 debug: scheduler
-	valgrind -q ./$< -d
+	valgrind -q --leak-check=full ./$< -d
 
 release: scheduler
 	./$<

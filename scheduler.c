@@ -38,7 +38,7 @@ void display_data(task_t* tasks, uint32_t n, uint64_t w_max) {
 }
 
 void vec_init(vec_t* self, size_t cap) {
-	self->array = (task_t*) malloc(cap * sizeof(task_t));
+	self->array = (task_t*) calloc(cap, sizeof(task_t));
 	self->at = 0;
 	self->capacity = cap;
 }
@@ -80,39 +80,21 @@ void vec_free(vec_t* self) {
 	free(self->array);
 }
 
-// Swap the position of two tasks in the array
-void swap(task_t* tasks, uint32_t left, uint32_t right) {
-	task_t temp = tasks[left];
-	tasks[left] = tasks[right];
-	tasks[right] = temp;
+int sort_w(const void* a, const void* b) {
+	task_t* lhs = (task_t*) a;
+	task_t* rhs = (task_t*) b;
+	return rhs->w < lhs->w;
 }
 
-// Find the partition point for a given pivot comparing by duration
-uint32_t partition_d(task_t* tasks, int32_t left, int32_t right, uint32_t pivot) {
-	int l = left - 1;
-	int r = right;
-
-	for (;;) {
-		while (tasks[++l].d < pivot) {}
-		while (r > 0 && tasks[--r].d > pivot) {}
-		if (l >= r) {
-			break;
-		} else {
-			swap(tasks, l, r);
-		}
-	}
-	swap(tasks, l, right);
-	return l;
+int sort_edd(const void* a, const void* b) {
+	task_t* lhs = (task_t*) a;
+	task_t* rhs = (task_t*) b;
+	return rhs->d < lhs->d;
 }
 
 // Earliest due date algorithm using quicksort
-void edd_quicksort(task_t* tasks, int32_t left, int32_t right) {
-	if (right - left <= 0) return;
-	
-	uint32_t pivot = tasks[right].d;
-	int32_t part  = partition_d(tasks, left, right, pivot);
-	edd_quicksort(tasks, left, part - 1);
-	edd_quicksort(tasks, part + 1, right);
+void edd_quicksort(task_t* tasks, int32_t n) {
+	qsort(tasks, n, sizeof(task_t), sort_edd);
 }
 
 // Load an input data file allocating and filling an array of task_t
@@ -123,7 +105,7 @@ void load_data(const char filename[], uint32_t* n, task_t** tasks, uint64_t* w_m
 	assert(fscanf(f, "%u", n) != EOF);
 
 	// assign the array pointer to valid memory
-	*tasks = (task_t*) malloc((unsigned long) *n * sizeof(task_t));
+	*tasks = (task_t*) calloc(*n, sizeof(task_t));
 	task_t* t = *tasks;
 	
 	*w_max = 0;
@@ -153,11 +135,11 @@ uint32_t moore_hodgson(task_t* tasks, uint32_t n) {
 		if (curr_p > tasks[i].d) {
 			curr_p -= tasks[i].p;
 			
-			// this task is late, add it 
-			// - find the longest task in lo until id is found
-			// - remove it from lo
+			// this task is late 
+			// - find the longest task in ot
+			// - remove it from ot
 			// - add it to lt
-			
+
 			int p_max = 0;
 			for (int j = 0; ot.array[j].id != tasks[i].id; j++) {
 				p_max = ot.array[j].p > ot.array[p_max].p ? j : p_max;
@@ -167,7 +149,7 @@ uint32_t moore_hodgson(task_t* tasks, uint32_t n) {
 			vec_push(&lt, vec_delete_at(&ot, p_max)); 
 	
 			if (debug) {
-				printf("LO[id: %i beeing late]----------------------------------------------\n", tasks[i].id);
+				printf("OT[id: %i beeing late]----------------------------------------------\n", tasks[i].id);
 				display_data(ot.array, ot.at, 0);
 				printf("LT[id: %i beeing late]----------------------------------------------\n", tasks[i].id);
 				display_data(lt.array, lt.at, 0);
@@ -181,6 +163,72 @@ uint32_t moore_hodgson(task_t* tasks, uint32_t n) {
 	return ot_n;
 }
 
+
+uint64_t compute_WI(task_t* tasks, uint32_t n) {
+	uint32_t on_time = moore_hodgson(tasks, n);
+	qsort(tasks, n, sizeof(task_t), sort_w);
+	
+	uint64_t wi = 0;
+	for (int i = (n - on_time - 1); i < n; i++) {
+		wi += tasks[i].w;
+	}
+
+	edd_quicksort(tasks, n);
+	return wi;
+}
+
+
+void debug_table(uint32_t** table, const size_t n, const size_t wi) {
+	for (int i = 0; i < n; i++) {
+		for (int j = 0; j < (wi + 1); j++) {
+			if (table[i][j] == UINT32_MAX) {
+				printf("∞\t");
+			} else {
+				printf("%u\t", table[i][j]);
+			}
+		}
+		puts("");
+	}
+}
+
+void populate_table(uint32_t*** table, task_t* tasks, size_t n, size_t wi) {
+	*table = (uint32_t**) calloc(n, sizeof(uint32_t*));
+	uint32_t** p = *table;
+	
+	for (int i = 0; i < n; i++) {
+		p[i] = (uint32_t*) calloc(wi + 1, sizeof(uint32_t));
+	}
+	
+
+	for (int w = 1; w < (wi + 1); w++) {
+		p[0][w] = UINT32_MAX;
+	}
+	p[0][tasks[0].w] = tasks[0].p;
+
+	for (int i = 1; i < n; i++) {
+		for (int w = 0; w < (wi + 1); w++) {
+			uint32_t lhs = p[i-1][w];
+
+			int v = w - (int) tasks[i].w;
+			uint32_t rhs = v >= 0 ? p[i-1][v] : UINT32_MAX;
+
+			if (rhs != UINT32_MAX && rhs + tasks[i].p <= tasks[i].d) {
+				p[i][w] = lhs >= rhs + tasks[i].p ? rhs + tasks[i].p: lhs;
+			} else {
+				p[i][w] = lhs;
+			}
+		}
+	}
+}
+
+
+void free_table(uint32_t** table, size_t n) {
+	for (int i = 0; i < n; i++) {
+		free(table[i]);
+	}
+	free(table);
+}
+
 int main(int argc, char** argv) {	
 	uint32_t n = 0;
 	uint64_t w_max = 0;
@@ -191,16 +239,28 @@ int main(int argc, char** argv) {
 	assert(w_max != 0);
 	assert(tasks != NULL);
 
-	edd_quicksort(tasks, 0, n - 1);
+	edd_quicksort(tasks, n);
 
 	debug = getopt(argc, argv, "d") != -1;
 	if (debug) {
 		display_data(tasks, n, w_max);
 	}
 	
-	printf("Moore: %i", moore_hodgson(tasks, n));
+	uint64_t wi = compute_WI(tasks, n);
 
+	if (debug) {
+		printf("WI: %lu\n", wi);
+	}
 
+	uint32_t** table = NULL;
+	populate_table(&table, tasks, n, wi);
+	assert(table != NULL);
+	
+	if (debug) {
+		debug_table(table, n, wi);
+	}
+
+	free_table(table, n);
 	free(tasks);
 	return 0;
 }
