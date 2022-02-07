@@ -1,4 +1,5 @@
 #include "scheduler.h"
+#include <sys/timeb.h>
 
 // debug flag
 int debug = 0;
@@ -79,34 +80,34 @@ void debug_table(uint32_t** table, const size_t n, const size_t wi) {
 
 // populate the dynamic programming table
 void populate_table(uint32_t*** table, task_t* tasks, size_t n, size_t wi) {
-	*table = (uint32_t**) calloc(n, sizeof(uint32_t*));
-	uint32_t** p = *table;
-	
-	for (int i = 0; i < n; i++) {
-		p[i] = (uint32_t*) calloc(wi + 1, sizeof(uint32_t));
-	}
-	
+    *table = (uint32_t**) calloc(n, sizeof(uint32_t*));
+    uint32_t** p = *table;
 
-	for (int w = 1; w < (wi + 1); w++) {
-		p[0][w] = UINT32_MAX;
-	}
-	p[0][tasks[0].w] = tasks[0].p;
+    for (int i = 0; i < n; i++) {
+        p[i] = (uint32_t*) calloc(wi + 1, sizeof(uint32_t));
+    }
 
-	for (int i = 1; i < n; i++) {
-		for (int w = 0; w < (wi + 1); w++) {
 
-			int v = w - (int) tasks[i].w;
-			
-			uint32_t lhs = p[i-1][w];
-			uint32_t rhs = v >= 0 ? p[i-1][v] : INT32_MAX;
-			
-			if (rhs != UINT32_MAX && rhs + tasks[i].p <= tasks[i].d) {
-				p[i][w] = MIN(lhs, rhs + tasks[i].p);
-			} else {
-				p[i][w] = lhs;
-			}
-		}
-	}
+    for (int w = 1; w < (wi + 1); w++) {
+        p[0][w] = UINT32_MAX;
+    }
+    p[0][tasks[0].w] = tasks[0].p;
+
+    for (int i = 1; i < n; i++) {
+        for (int w = 0; w < (wi + 1); w++) {
+
+            int v = w - (int) tasks[i].w;
+                    
+            uint32_t lhs = p[i-1][w];
+            uint32_t rhs = v >= 0 ? p[i-1][v] : INT32_MAX;
+                
+            if (rhs != UINT32_MAX && rhs + tasks[i].p <= tasks[i].d) {
+                p[i][w] = MIN(lhs, rhs + tasks[i].p);
+            } else {
+                p[i][w] = lhs;
+            }
+        }
+    }
 }
 
 void find_sol(uint32_t** table, size_t n, uint64_t wi, task_t *tasks) {
@@ -116,6 +117,8 @@ void find_sol(uint32_t** table, size_t n, uint64_t wi, task_t *tasks) {
 
     vec_t solution;
     vec_init(&solution, n);
+
+    printf("%lx %lu %lu", (size_t) solution.array, solution.at, solution.capacity);
 
     for (int i = wi; i > 0; i--) {
         uint32_t v = table[j][i];
@@ -127,6 +130,7 @@ void find_sol(uint32_t** table, size_t n, uint64_t wi, task_t *tasks) {
         }
 
         if (j > 1 && dd == v && table[j-1][i] == UINT32_MAX) {
+            printf("upper i: %u, j: %u\n", i, j);
             vec_push(&solution, tasks[j]);
             
             dd -= tasks[j].p;
@@ -137,6 +141,7 @@ void find_sol(uint32_t** table, size_t n, uint64_t wi, task_t *tasks) {
             while (j >= 1 && dd == v && table[j-1][i] == v) {
                     j -= 1;
             }
+            printf("lower i: %u, j: %u\n", i, j);
             vec_push(&solution, tasks[j]);
             dd -= tasks[j].p;
             
@@ -159,26 +164,31 @@ void free_table(uint32_t** table, size_t n) {
 	free(table);
 }
 
-float64_t compute_epsilon(double k, size_t n, uint64_t w_max)
+void replace_weights(task_t* tasks, size_t n, double k)
 {
-    return (k / (w_max / n));
-}
-
-static void     redefine_weight(unsigned int n, TASK *tasks, double k)
-{
-    unsigned int    index = 0;
-
-    for (index = 0; tasks != NULL && tasks[index] != NULL && index < n; index += 1) {
-        tasks[index]->w /= k;
+    for (int i = 0; i < n; i++) {
+        tasks[i].w = tasks[i].w / k;
     }
 }
 
-void fully_polynomial_time_approximation_scheme(double k, unsigned int n, TASK *tasks, unsigned long long w_max)
-{
-    double epsilon = compute_epsilon(k, n, w_max);
+void solve(task_t* tasks, size_t n, double k) {
+    uint64_t wi = compute_WI(tasks, n);
 
-    printf("ε = %.3lf\n", epsilon);
-    redefine_weight(n, tasks, k);
+    if (debug) {
+        printf("WI: %lu\n", wi);
+    }
+
+    uint32_t** table = NULL;
+    populate_table(&table, tasks, n, wi);
+    assert(table != NULL);
+
+    if (debug) {
+        // debug_table(table, n, wi);
+    }
+    
+    find_sol(table, n, wi, tasks);
+
+    free_table(table, n);
 }
 
 
@@ -188,11 +198,17 @@ int main(int argc, char** argv) {
 	task_t* tasks = NULL;
 
         if (argc < 2) {
-            fprintf(stderr, "Missing file argument");
+            fprintf(stderr, "Missing file and k argument");
             exit(1);
         }
 
-	load_data(argv[argc - 1], &n, &tasks, &w_max);
+	load_data(argv[argc - 2], &n, &tasks, &w_max);
+	double k = atof(argv[argc - 1]);
+        double epsilon = (k / (w_max / n));
+        printf("epsilon: %.5lf\n", epsilon);
+
+        replace_weights(tasks, n, k);
+
 	assert(n != 0);
 	assert(w_max != 0);
 	assert(tasks != NULL);
@@ -203,24 +219,15 @@ int main(int argc, char** argv) {
 	if (debug) {
 	    display_data(tasks, n, w_max);
 	}
+        struct timeb t0, t1;
+        ftime(&t0);
+        solve(tasks, n, k);
+        ftime(&t1);
+        float cpu_time = (float)(t1.time - t0.time) + (float)(t1.millitm-t0.millitm)/1000;
+        printf("\n[CPU Time] %.3f s.\n", cpu_time);
+
 	
-	uint64_t wi = compute_WI(tasks, n);
 
-	if (debug) {
-	    printf("WI: %lu\n", wi);
-	}
-
-	uint32_t** table = NULL;
-	populate_table(&table, tasks, n, wi);
-	assert(table != NULL);
-
-	if (debug) {
-	    debug_table(table, n, wi);
-	}
-	
-	find_sol(table, n, wi, tasks);
-
-	free_table(table, n);
 	free(tasks);
 	return 0;
 }
