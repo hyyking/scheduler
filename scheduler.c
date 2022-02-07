@@ -8,14 +8,14 @@
 // debug flag
 int debug = 0;
 
-// id: An unsigned integer for storing the index of the task (T 1 is the first task, its id is one)
-// p: An unsigned integer for storing the processing time of the task
-// w: An unsigned long long for storing the weight of the task
-// d: An unsigned integer d for storing the due date of the task
 typedef struct {
+	// id: An unsigned integer for storing the index of the task (T 1 is the first task, its id is one)
 	uint32_t id;
+	// p: An unsigned integer for storing the processing time of the task
 	uint32_t p;
+	// w: An unsigned long long for storing the weight of the task
 	uint64_t w;
+	// d: An unsigned integer d for storing the due date of the task
 	uint32_t d;
 } task_t;
 
@@ -80,10 +80,15 @@ void vec_free(vec_t* self) {
 	free(self->array);
 }
 
-int sort_w(const void* a, const void* b) {
+int sort_w_incr(const void* a, const void* b) {
 	task_t* lhs = (task_t*) a;
 	task_t* rhs = (task_t*) b;
 	return rhs->w < lhs->w;
+}
+int sort_id(const void* a, const void* b) {
+	task_t* lhs = (task_t*) a;
+	task_t* rhs = (task_t*) b;
+	return rhs->id < lhs->id;
 }
 
 int sort_edd(const void* a, const void* b) {
@@ -163,21 +168,22 @@ uint32_t moore_hodgson(task_t* tasks, uint32_t n) {
 	return ot_n;
 }
 
-
+// Compute the maximum profit
 uint64_t compute_WI(task_t* tasks, uint32_t n) {
 	uint32_t on_time = moore_hodgson(tasks, n);
-	qsort(tasks, n, sizeof(task_t), sort_w);
+	qsort(tasks, n, sizeof(task_t), sort_w_incr);
 	
 	uint64_t wi = 0;
 	for (int i = (n - on_time - 1); i < n; i++) {
 		wi += tasks[i].w;
 	}
 
+	qsort(tasks, n, sizeof(task_t), sort_id);
 	edd_quicksort(tasks, n);
 	return wi;
 }
 
-
+// debug the dynamic programming table
 void debug_table(uint32_t** table, const size_t n, const size_t wi) {
 	for (int i = 0; i < n; i++) {
 		for (int j = 0; j < (wi + 1); j++) {
@@ -191,6 +197,7 @@ void debug_table(uint32_t** table, const size_t n, const size_t wi) {
 	}
 }
 
+// populate the dynamic programming table
 void populate_table(uint32_t*** table, task_t* tasks, size_t n, size_t wi) {
 	*table = (uint32_t**) calloc(n, sizeof(uint32_t*));
 	uint32_t** p = *table;
@@ -207,18 +214,61 @@ void populate_table(uint32_t*** table, task_t* tasks, size_t n, size_t wi) {
 
 	for (int i = 1; i < n; i++) {
 		for (int w = 0; w < (wi + 1); w++) {
-			uint32_t lhs = p[i-1][w];
 
 			int v = w - (int) tasks[i].w;
-			uint32_t rhs = v >= 0 ? p[i-1][v] : UINT32_MAX;
-
+			
+			uint32_t lhs = p[i-1][w];
+			uint32_t rhs = v >= 0 ? p[i-1][v] : INT32_MAX;
+			
 			if (rhs != UINT32_MAX && rhs + tasks[i].p <= tasks[i].d) {
-				p[i][w] = lhs >= rhs + tasks[i].p ? rhs + tasks[i].p: lhs;
+				p[i][w] = lhs >= rhs + tasks[i].p ? rhs + tasks[i].p : lhs;
 			} else {
 				p[i][w] = lhs;
 			}
 		}
 	}
+}
+
+void find_sol(uint32_t** table, size_t n, uint64_t wi, task_t *tasks) {
+	int j = n - 1;
+	uint64_t profit = 0;
+	uint64_t dd = tasks[n-1].d;
+
+	vec_t solution;
+	vec_init(&solution, n);
+
+	for (int i = wi; i > 0; i--) {
+		uint32_t v = table[j][i];
+		if (v == UINT32_MAX) {
+			continue;
+		}
+		if (dd == 0) {
+			break;
+		}
+
+		if (j > 1 && dd == v && table[j-1][i] == UINT32_MAX) {
+			vec_push(&solution, tasks[j]);
+			
+			dd -= tasks[j].p;
+			profit += tasks[j].w;
+
+			j -= 1;
+		} else { 
+			while (j >= 1 && dd == v && table[j-1][i] == v) {
+				j -= 1;
+			}
+			vec_push(&solution, tasks[j]);
+			dd -= tasks[j].p;
+			
+			profit += tasks[j].w;
+		}
+	}
+
+	puts("----- Solution:");
+	printf("Profit: %lu \n", profit);
+	display_data(solution.array, solution.at, 0);
+
+	vec_free(&solution);
 }
 
 
@@ -255,10 +305,12 @@ int main(int argc, char** argv) {
 	uint32_t** table = NULL;
 	populate_table(&table, tasks, n, wi);
 	assert(table != NULL);
-	
+
 	if (debug) {
 		debug_table(table, n, wi);
 	}
+	
+	find_sol(table, n, wi, tasks);
 
 	free_table(table, n);
 	free(tasks);
