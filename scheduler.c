@@ -35,8 +35,6 @@ uint32_t moore_hodgson(task_t* tasks, uint32_t n) {
             vec_push(&lt, vec_delete_at(&ot, p_max)); 
 
             if (debug) {
-                printf("OT[id: %i beeing late]------------------\n", tasks[p_max].id);
-                display_data(ot.array, ot.at, 0);
                 printf("LT[id: %i beeing late]------------------\n", tasks[p_max].id);
                 display_data(lt.array, lt.at, 0);
             }
@@ -148,8 +146,8 @@ void find_sol(uint32_t** table, size_t n, uint64_t wi, task_t *tasks, double k) 
             profit += tasks[j].w;
 
             j--;
-        } else if (j >= 1 && dd == v) { 
-            while (table[j-1][i] == v) {
+        } else if (j >= 1 && dd == v) {
+            while (j > 1 && table[j-1][i] == v) {
                 j--;
             }
             vec_push(&solution, tasks[j]);
