@@ -3,21 +3,24 @@
 ## Build and run
 
 There are two kinds of builds, release and debug. Debug builds print debug
-informations and are run with valgrind.
+information and run the executable with valgrind.
 
+* Building individual executable:
 
-* Dynamic Programming Scheduler:
+    - make scheduler
+    - make bischeduler
+
+* Dynamic Programming Scheduler build and run:
     
     - make release-sched CLI=i6.dat
     - make debug-sched CLI=i6.dat
 
-* FPTAS Scheduler:
+* FPTAS Scheduler build and run:
     
-    - release-fptas CLI="i6.dat 1"
-    - debug-fptas CLI="i6.dat 1"
+    - make release-sched CLI="i6.dat 1"
+    - make debug-sched CLI="i50b.dat 525"
 
+* Biobjective scheduler build and run:
 
-* Biobjective scheduler:
-
-    - release-bisched CLI="i6.dat"
-    - debug-bisched CLI="i6.dat"
+    - make release-bisched CLI="i6.dat"
+    - make debug-bisched CLI="i6.dat"
