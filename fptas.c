@@ -99,7 +99,7 @@ void populate_table(uint32_t*** table, task_t* tasks, size_t n, size_t wi) {
             int v = w - (int) tasks[i].w;
                     
             uint32_t lhs = p[i-1][w];
-            uint32_t rhs = v >= 0 ? p[i-1][v] : INT32_MAX;
+            uint32_t rhs = v >= 0 ? p[i-1][v] : UINT32_MAX;
                 
             if (rhs != UINT32_MAX && rhs + tasks[i].p <= tasks[i].d) {
                 p[i][w] = MIN(lhs, rhs + tasks[i].p);
@@ -118,8 +118,9 @@ void find_sol(uint32_t** table, size_t n, uint64_t wi, task_t *tasks) {
     vec_t solution;
     vec_init(&solution, n);
 
-    printf("%lx %lu %lu", (size_t) solution.array, solution.at, solution.capacity);
+    // rintf("%lx %lu %lu", (size_t) solution.array, solution.at, solution.capacity);
 
+    
     for (int i = wi; i > 0; i--) {
         uint32_t v = table[j][i];
         if (v == UINT32_MAX) {
@@ -143,11 +144,16 @@ void find_sol(uint32_t** table, size_t n, uint64_t wi, task_t *tasks) {
             }
             printf("lower i: %u, j: %u\n", i, j);
             vec_push(&solution, tasks[j]);
+
+            if (j == 0) {
+                goto ret;
+            }
+
             dd -= tasks[j].p;
-            
             profit += tasks[j].w;
         }
     }
+ret:
 
     puts("----- Solution:");
     printf("Profit: %lu \n", profit);

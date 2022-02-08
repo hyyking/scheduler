@@ -1,2 +1,6 @@
 *.tar.gz
 scheduler
+fptas
+bischeduler
+tags
+.ccls-cache
